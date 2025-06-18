@@ -1,78 +1,136 @@
 // Свързване с базата данни
 use('autopart_shop');
 
-// === ПОЛУЧАВАНЕ НА ДАННИ (READ) ===
+//////////////////////////////////////////////////////
+// ============ ИЗВЛИЧАНЕ НА ДАННИ (READ) ============
+//////////////////////////////////////////////////////
 
+// --- PARTS ---
 // Извличане на всички части
-// Всички документи от колекцията parts
 db.parts.find();
 
-// Филтриране на части по категория "Brakes"
+// Части от категория "Brakes"
 db.parts.find({ category: "Brakes" });
 
-// Филтриране на части по категория и марка
-// Пример: части от категория "Engine" и марка "Bosch"
+// Части от категория "Engine" и марка "Bosch"
 db.parts.find({ category: "Engine", brand: "Bosch" });
 
-// Извличане на всички клиенти
+
+// --- CUSTOMERS ---
+// Всички клиенти
 db.customers.find();
 
-// Клиенти от град София
+// Клиенти от град "Sofia"
 db.customers.find({ "address.city": "Sofia" });
 
 // Клиенти с повече от 100 точки за лоялност
 db.customers.find({ loyaltyPoints: { $gt: 100 } });
 
-// === АКТУАЛИЗАЦИИ (UPDATE) ===
 
-// Актуализиране на цена на част с име "Oil Filter"
+// --- SUPPLIERS ---
+// Всички доставчици
+db.suppliers.find();
+
+// Доставчици от държава "Germany"
+db.suppliers.find({ country: "Germany" });
+
+// Доставчици от "Germany" с част "Oil Filter"
+db.suppliers.find({ country: "Germany", suppliedParts: "Oil Filter" });
+
+
+// --- ORDERS ---
+// Всички поръчки
+db.orders.find();
+
+// Поръчки с обща сума над 150
+db.orders.find({ total: { $gt: 150 } });
+
+// Поръчки от клиент със специфично ID
+db.orders.find({ customerId: ObjectId("665f21feaa7a4eb9ef8cb1a1") });
+
+
+// --- EMPLOYEES ---
+// Всички служители
+db.employees.find();
+
+// Служители със заплата над 1500
+db.employees.find({ salary: { $gt: 1500 } });
+
+// Служители със заплата над 1500 и позиция "Technician"
+db.employees.find({ salary: { $gt: 1500 }, position: "Technician" });
+
+//////////////////////////////////////////////////////
+// ============ АКТУАЛИЗАЦИЯ (UPDATE) ===============
+//////////////////////////////////////////////////////
+
+// --- PARTS ---
 db.parts.updateOne(
   { name: "Oil Filter" },
   { $set: { price: 27.5 } }
 );
 
-// Актуализиране на телефонен номер на клиент по имейл
+// --- CUSTOMERS ---
 db.customers.updateOne(
   { email: "ivan@example.com" },
   { $set: { phone: "0888999999" } }
 );
 
-// Добавяне на нова доставяна част към доставчик
-// Пример: добавяне на "Brake Disc" към доставчика "AutoParts Ltd"
+// --- SUPPLIERS ---
 db.suppliers.updateOne(
   { name: "AutoParts Ltd" },
   { $addToSet: { suppliedParts: "Brake Disc" } }
 );
 
-// === ИЗТРИВАНЕ (DELETE) ===
+// --- ORDERS ---
+db.orders.updateOne(
+  { total: { $gt: 200 } },
+  { $set: { status: "processed" } }
+);
 
-// Изтриване на част с име "Clutch Kit"
+// --- EMPLOYEES ---
+db.employees.updateOne(
+  { name: "Ivan Stanchev" },
+  { $set: { salary: 1800 } }
+);
+
+//////////////////////////////////////////////////////
+// ================ ИЗТРИВАНЕ (DELETE) ==============
+//////////////////////////////////////////////////////
+
+// --- PARTS ---
 db.parts.deleteOne({ name: "Clutch Kit" });
 
-// Изтриване на клиент с конкретен имейл
+// --- CUSTOMERS ---
 db.customers.deleteOne({ email: "client9@example.com" });
 
-// Изтриване на служител с име "Todor Zlatev"
+// --- SUPPLIERS ---
+db.suppliers.deleteOne({ name: "AsiaParts" });
+
+// --- ORDERS ---
+db.orders.deleteOne({ total: { $lt: 50 } });
+
+// --- EMPLOYEES ---
 db.employees.deleteOne({ name: "Todor Zlatev" });
 
-// === AGGREGATE PIPELINE ===
+//////////////////////////////////////////////////////
+// ================= АГРЕГИРАНЕ (AGGREGATE) =========
+//////////////////////////////////////////////////////
 
-// Групиране на части по категория и изчисляване на средна цена
+// --- PARTS ---
+// Групиране по категория, със средна цена и обща наличност
 db.parts.aggregate([
-  { $group: {
+  {
+    $group: {
       _id: "$category",
       avgPrice: { $avg: "$price" },
       totalStock: { $sum: "$stock" }
     }
-  }
+  },
+  { $sort: { avgPrice: -1 } }
 ]);
 
+// --- CUSTOMERS ---
 // Броене на клиенти по град
-// Показва броя на клиентите за всеки град
-
-
-
-
 db.customers.aggregate([
   { $group: {
       _id: "$address.city",
@@ -82,9 +140,31 @@ db.customers.aggregate([
   { $sort: { count: -1 } }
 ]);
 
-// Сумиране на стойности на поръчки по клиент
+// --- SUPPLIERS ---
+// Групиране на доставчици по държава с брой доставени части
+db.suppliers.aggregate([
+  {
+    $project: {
+      name: 1,
+      country: 1,
+      partsCount: { $size: "$suppliedParts" }
+    }
+  },
+  {
+    $group: {
+      _id: "$country",
+      totalParts: { $sum: "$partsCount" },
+      suppliers: { $push: "$name" }
+    }
+  },
+  { $sort: { totalParts: -1 } }
+]);
+
+// --- ORDERS ---
+// Общо похарчено и брой поръчки по клиент
 db.orders.aggregate([
-  { $group: {
+  {
+    $group: {
       _id: "$customerId",
       totalSpent: { $sum: "$total" },
       orderCount: { $sum: 1 }
@@ -93,9 +173,16 @@ db.orders.aggregate([
   { $sort: { totalSpent: -1 } }
 ]);
 
-// Извличане на служители със заплата над 1500, сортирани по заплата
-
+// --- EMPLOYEES ---
+// Групиране по позиция със средна заплата и брой служители
 db.employees.aggregate([
-  { $match: { salary: { $gt: 1500 } } },
-  { $sort: { salary: -1 } }
+  {
+    $group: {
+      _id: "$position",
+      avgSalary: { $avg: "$salary" },
+      count: { $sum: 1 }
+    }
+  },
+  { $sort: { avgSalary: -1 } }
 ]);
+
