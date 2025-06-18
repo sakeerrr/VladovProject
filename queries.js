@@ -117,7 +117,7 @@ db.employees.deleteOne({ name: "Todor Zlatev" });
 //////////////////////////////////////////////////////
 
 // --- PARTS ---
-// Групиране по категория, със средна цена и обща наличност
+// 1. Групиране по категория със средна цена и обща наличност
 db.parts.aggregate([
   {
     $group: {
@@ -129,10 +129,22 @@ db.parts.aggregate([
   { $sort: { avgPrice: -1 } }
 ]);
 
+// 2. Брой части по марка
+db.parts.aggregate([
+  {
+    $group: {
+      _id: "$brand",
+      partCount: { $sum: 1 }
+    }
+  },
+  { $sort: { partCount: -1 } }
+]);
+
 // --- CUSTOMERS ---
-// Броене на клиенти по град
+// 1. Броене на клиенти по град
 db.customers.aggregate([
-  { $group: {
+  {
+    $group: {
       _id: "$address.city",
       count: { $sum: 1 }
     }
@@ -140,8 +152,23 @@ db.customers.aggregate([
   { $sort: { count: -1 } }
 ]);
 
+// 2. Средни точки за лоялност по възрастова група
+db.customers.aggregate([
+  {
+    $bucket: {
+      groupBy: "$age",
+      boundaries: [18, 30, 45, 60, 100],
+      default: "Other",
+      output: {
+        avgLoyaltyPoints: { $avg: "$loyaltyPoints" },
+        count: { $sum: 1 }
+      }
+    }
+  }
+]);
+
 // --- SUPPLIERS ---
-// Групиране на доставчици по държава с брой доставени части
+// 1. Групиране на доставчици по държава с брой доставени части
 db.suppliers.aggregate([
   {
     $project: {
@@ -160,8 +187,19 @@ db.suppliers.aggregate([
   { $sort: { totalParts: -1 } }
 ]);
 
+// 2. Брой доставчици по държава
+db.suppliers.aggregate([
+  {
+    $group: {
+      _id: "$country",
+      supplierCount: { $sum: 1 }
+    }
+  },
+  { $sort: { supplierCount: -1 } }
+]);
+
 // --- ORDERS ---
-// Общо похарчено и брой поръчки по клиент
+// 1. Общо похарчено и брой поръчки по клиент
 db.orders.aggregate([
   {
     $group: {
@@ -173,8 +211,19 @@ db.orders.aggregate([
   { $sort: { totalSpent: -1 } }
 ]);
 
+// 2. Брой поръчки по статус
+db.orders.aggregate([
+  {
+    $group: {
+      _id: "$status",
+      count: { $sum: 1 }
+    }
+  },
+  { $sort: { count: -1 } }
+]);
+
 // --- EMPLOYEES ---
-// Групиране по позиция със средна заплата и брой служители
+// 1. Групиране по позиция със средна заплата и брой служители
 db.employees.aggregate([
   {
     $group: {
@@ -184,5 +233,16 @@ db.employees.aggregate([
     }
   },
   { $sort: { avgSalary: -1 } }
+]);
+
+// 2. Брой служители по град
+db.employees.aggregate([
+  {
+    $group: {
+      _id: "$address.city",
+      employeeCount: { $sum: 1 }
+    }
+  },
+  { $sort: { employeeCount: -1 } }
 ]);
 
